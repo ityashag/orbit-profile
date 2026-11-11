@@ -1,0 +1,42 @@
+name: Refresh profile
+
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-profile
+  cancel-in-progress: true
+
+jobs:
+  refresh:
+    # Only in a profile repo (named after its owner), never in the template itself.
+    if: github.event.repository.name == github.repository_owner
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Rebuild from live GitHub data
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python3 build.py
+
+      - name: Commit if anything changed
+        run: |
+          git add README.md assets
+          if git diff --cached --quiet; then
+            echo "Nothing changed."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: refresh profile"
+          git push
